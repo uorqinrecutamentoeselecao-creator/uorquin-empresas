@@ -4,10 +4,59 @@ import requests
 from datetime import datetime
 from oauth2client.service_account import ServiceAccountCredentials
 
+# =========================
+# CONFIG
+# =========================
 st.set_page_config(page_title="Uorquin Empresas", layout="centered")
 
-st.image("logo.png", width=220)
-st.markdown("<h3 style='text-align:center'>Cadastro de Vagas - Empresas</h3>", unsafe_allow_html=True)
+# =========================
+# ESTILO (UORQUIN BRAND)
+# =========================
+st.markdown("""
+<style>
+body {
+    background-color: #f5f7fb;
+}
+
+.header {
+    text-align: center;
+    padding: 10px;
+}
+
+.card {
+    background: white;
+    padding: 25px;
+    border-radius: 15px;
+    box-shadow: 0px 4px 20px rgba(0,0,0,0.05);
+    margin-bottom: 20px;
+}
+
+.gradient {
+    background: linear-gradient(90deg, #1F2A44, #4CAF7A);
+    padding: 12px;
+    border-radius: 10px;
+    color: white;
+    text-align: center;
+    font-weight: bold;
+}
+
+.stButton>button {
+    border-radius: 10px;
+    padding: 10px;
+    font-weight: bold;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# =========================
+# HEADER
+# =========================
+st.markdown('<div class="header">', unsafe_allow_html=True)
+st.image("logo.png", width=180)
+st.markdown("<h2>Cadastro de Vagas</h2>", unsafe_allow_html=True)
+st.markdown("<p style='color:gray'>Conectando pessoas a oportunidades</p>", unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================
 # ESTADOS
@@ -27,7 +76,7 @@ def buscar_cidades(uf):
     return []
 
 # =========================
-# GERAR CODIGO DA VAGA
+# GERAR CODIGO
 # =========================
 def gerar_codigo_vaga(estado, cidade, empresa):
     estado = estado.upper()
@@ -35,13 +84,10 @@ def gerar_codigo_vaga(estado, cidade, empresa):
     empresa = empresa.replace(" ", "")[:3].upper()
 
     data = datetime.now()
-    dia = data.strftime("%d")
-    mes = data.strftime("%m")
-
-    return f"{estado}{cidade}{empresa}{dia}{mes}"
+    return f"{estado}{cidade}{empresa}{data.strftime('%d%m')}"
 
 # =========================
-# GOOGLE SHEETS (SHEET2)
+# GOOGLE SHEETS
 # =========================
 def conectar_planilha():
     scope = ["https://spreadsheets.google.com/feeds",
@@ -52,12 +98,8 @@ def conectar_planilha():
     )
 
     client = gspread.authorize(creds)
-
     return client.open("Banco_Uorquin").worksheet("Sheet2")
 
-# =========================
-# SALVAR VAGA
-# =========================
 def salvar_vaga(dados):
     planilha = conectar_planilha()
     data_hora = datetime.now().strftime("%d/%m/%Y %H:%M")
@@ -68,29 +110,18 @@ def salvar_vaga(dados):
         dados["empresa"]["nome"]
     )
 
-    # Cabeçalho automático
     if not planilha.row_values(1):
-
         cabecalho = [
-            "Codigo_Vaga",
-            "Data",
-            "Empresa","CNPJ","Email","Telefone",
-            "Estado","Cidade",
-            "Titulo_Vaga","Descricao",
+            "Codigo_Vaga","Data","Empresa","CNPJ","Email","Telefone",
+            "Estado","Cidade","Titulo_Vaga","Descricao",
             "Salario","Tipo","Modalidade"
         ]
-
-        for i in range(1,11):
-            cabecalho.append(f"Beneficio_{i}")
-
-        for i in range(1,11):
-            cabecalho.append(f"Requisito_{i}")
-
+        for i in range(1,11): cabecalho.append(f"Beneficio_{i}")
+        for i in range(1,11): cabecalho.append(f"Requisito_{i}")
         planilha.append_row(cabecalho)
 
     linha = [
-        codigo,
-        data_hora,
+        codigo, data_hora,
         dados["empresa"]["nome"],
         dados["empresa"]["cnpj"],
         dados["empresa"]["email"],
@@ -104,19 +135,8 @@ def salvar_vaga(dados):
         dados["vaga"]["modalidade"]
     ]
 
-    # Benefícios
-    for i in range(10):
-        if i < len(dados["beneficios"]):
-            linha.append(dados["beneficios"][i])
-        else:
-            linha.append("")
-
-    # Requisitos
-    for i in range(10):
-        if i < len(dados["requisitos"]):
-            linha.append(dados["requisitos"][i])
-        else:
-            linha.append("")
+    linha += dados["beneficios"] + [""]*(10-len(dados["beneficios"]))
+    linha += dados["requisitos"] + [""]*(10-len(dados["requisitos"]))
 
     planilha.append_row(linha)
 
@@ -135,14 +155,20 @@ if "qtd_beneficios" not in st.session_state:
 if "qtd_requisitos" not in st.session_state:
     st.session_state.qtd_requisitos = 1
 
+# =========================
+# PROGRESSO VISUAL
+# =========================
+steps = ["Empresa", "Vaga", "Benefícios", "Requisitos"]
+st.markdown(f'<div class="gradient">Etapa {st.session_state.step_emp}/4 - {steps[st.session_state.step_emp-1]}</div>', unsafe_allow_html=True)
 st.progress(st.session_state.step_emp / 4)
 
 # =========================
-# ETAPA 1 - EMPRESA
+# ETAPA 1
 # =========================
 if st.session_state.step_emp == 1:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
 
-    st.subheader("Informações da Empresa")
+    st.subheader("🏢 Informações da Empresa")
 
     col1, col2 = st.columns(2)
 
@@ -157,7 +183,6 @@ if st.session_state.step_emp == 1:
         cidade = st.selectbox("Cidade", buscar_cidades(estado))
 
     if st.button("Continuar ➡️"):
-
         st.session_state.dados_emp["empresa"] = {
             "nome": nome,
             "cnpj": cnpj,
@@ -166,28 +191,28 @@ if st.session_state.step_emp == 1:
             "estado": estado,
             "cidade": cidade
         }
-
         st.session_state.step_emp = 2
         st.rerun()
 
+    st.markdown('</div>', unsafe_allow_html=True)
+
 # =========================
-# ETAPA 2 - VAGA
+# ETAPA 2
 # =========================
 elif st.session_state.step_emp == 2:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
 
-    st.subheader("Descrição da Vaga")
+    st.subheader("📄 Descrição da Vaga")
 
     titulo = st.text_input("Título da vaga")
-    descricao = st.text_area("Descrição completa")
+    descricao = st.text_area("Descrição")
 
     col1, col2, col3 = st.columns(3)
 
     with col1:
         salario = st.text_input("Salário")
-
     with col2:
         tipo = st.selectbox("Tipo", ["CLT","PJ","Estágio"])
-
     with col3:
         modalidade = st.selectbox("Modalidade", ["Presencial","Remoto","Híbrido"])
 
@@ -198,7 +223,6 @@ elif st.session_state.step_emp == 2:
         st.rerun()
 
     if col2.button("Continuar ➡️"):
-
         st.session_state.dados_emp["vaga"] = {
             "titulo": titulo,
             "descricao": descricao,
@@ -206,22 +230,23 @@ elif st.session_state.step_emp == 2:
             "tipo": tipo,
             "modalidade": modalidade
         }
-
         st.session_state.step_emp = 3
         st.rerun()
 
+    st.markdown('</div>', unsafe_allow_html=True)
+
 # =========================
-# ETAPA 3 - BENEFÍCIOS
+# ETAPA 3
 # =========================
 elif st.session_state.step_emp == 3:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
 
-    st.subheader("Benefícios")
+    st.subheader("🎁 Benefícios")
 
     beneficios = []
 
     for i in range(st.session_state.qtd_beneficios):
-        b = st.text_input(f"Benefício {i+1}", key=f"benef_{i}")
-        beneficios.append(b)
+        beneficios.append(st.text_input(f"Benefício {i+1}", key=f"benef_{i}"))
 
     if st.session_state.qtd_beneficios < 10:
         if st.button("➕ Adicionar benefício"):
@@ -239,18 +264,20 @@ elif st.session_state.step_emp == 3:
         st.session_state.step_emp = 4
         st.rerun()
 
+    st.markdown('</div>', unsafe_allow_html=True)
+
 # =========================
-# ETAPA 4 - REQUISITOS
+# ETAPA 4
 # =========================
 elif st.session_state.step_emp == 4:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
 
-    st.subheader("Pré-requisitos")
+    st.subheader("📌 Pré-requisitos")
 
     requisitos = []
 
     for i in range(st.session_state.qtd_requisitos):
-        r = st.text_input(f"Requisito {i+1}", key=f"req_{i}")
-        requisitos.append(r)
+        requisitos.append(st.text_input(f"Requisito {i+1}", key=f"req_{i}"))
 
     if st.session_state.qtd_requisitos < 10:
         if st.button("➕ Adicionar requisito"):
@@ -264,17 +291,16 @@ elif st.session_state.step_emp == 4:
         st.rerun()
 
     if col2.button("🚀 Publicar vaga"):
-
         st.session_state.dados_emp["requisitos"] = requisitos
-
         salvar_vaga(st.session_state.dados_emp)
 
-        st.success("Vaga cadastrada com sucesso!")
+        st.success("✅ Vaga publicada com sucesso!")
 
-        # RESET
         st.session_state.step_emp = 1
         st.session_state.dados_emp = {}
         st.session_state.qtd_beneficios = 1
         st.session_state.qtd_requisitos = 1
 
         st.rerun()
+
+    st.markdown('</div>', unsafe_allow_html=True)
